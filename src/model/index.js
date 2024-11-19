@@ -64,7 +64,6 @@ export async function processImages(imgSrcArr, truncatedMobileNet) {
 
   return { xs, ys };
 }
-
 export async function buildModel(
   truncatedMobileNet,
   setLoss,
@@ -76,21 +75,16 @@ export async function buildModel(
 ) {
   const model = tf.sequential({
     layers: [
-      // Flattens the input to a vector so we can use it in a dense layer. While
-      // technically a layer, this only performs a reshape (and has no training
-      // parameters).
       tf.layers.flatten({
         inputShape: truncatedMobileNet.outputs[0].shape.slice(1),
       }),
-      // Layer 1.
       tf.layers.dense({
         units: hiddenUnits,
         activation: "relu",
         kernelInitializer: "varianceScaling",
         useBias: true,
       }),
-      // Layer 2. The number of units of the last layer should correspond
-      // to the number of classes we want to predict.
+      //tf.layers.globalAveragePooling2d(), // Ensure this is correctly added
       tf.layers.dense({
         units: 4,
         kernelInitializer: "varianceScaling",
@@ -113,7 +107,6 @@ export async function buildModel(
       },
       onTrainEnd: async () => {
         store.set(trainingProgressAtom, -1);
-
         console.log("Training has ended.");
       },
       onEpochEnd: async (epoch, logs) => {
@@ -132,7 +125,6 @@ export async function buildModel(
 
   return model;
 }
-
 export async function predict(truncatedMobileNet, model, img) {
   const embeddings = truncatedMobileNet.predict(img);
   const predictions = await model.predict(embeddings);
@@ -195,3 +187,43 @@ export async function base64ToTensor(base64) {
     img.src = base64;
   });
 }
+export async function generateGradCAM(model, truncatedMobileNet, imgTensor, classIndex) {
+  return tf.tidy(() => {
+    // Get the last conv layer of MobileNet
+    const lastConvLayer = truncatedMobileNet.getLayer("conv_pw_13_relu");
+    
+    // First, get the conv layer outputs
+    const convOutputs = lastConvLayer.apply(imgTensor);
+    
+    // Then pass through our custom model
+    const predictions = model.predict(convOutputs);
+    
+    // Calculate gradients of the target class with respect to conv outputs
+    const targetClassPredictions = predictions.gather([classIndex], 1);
+    const grads = tf.grad((t) => {
+      const predsFromConv = model.predict(t);
+      return predsFromConv.gather([classIndex], 1);
+    })(convOutputs);
+    
+    // Global average pooling on gradients
+    const pooledGrads = tf.mean(grads, [1, 2]);
+    
+    // Weight the conv outputs with gradients
+    const weightedOutputs = tf.mul(
+      convOutputs,
+      pooledGrads.reshape([1, 1, 1, pooledGrads.shape[0]])
+    );
+    
+    // Generate heatmap
+    let heatmap = tf.mean(weightedOutputs, -1);
+    heatmap = tf.relu(heatmap);
+    
+    // Normalize heatmap
+    const max = tf.max(heatmap);
+    const min = tf.min(heatmap);
+    heatmap = heatmap.sub(min).div(max.sub(min));
+    
+    return heatmap;
+  });
+}
+
