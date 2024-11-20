@@ -141,24 +141,57 @@ export async function predict(truncatedMobileNet, model, img) {
   return classId;
 }
 
-export async function predictDirection(webcamRef, truncatedMobileNet, model) {
+export async function predictDirection(webcamRef, truncatedMobileNet, model, setGestureFeedback) {
   const newImageSrc = webcamRef.current.getScreenshot();
   if (newImageSrc) {
     const imgTensor = await base64ToTensor(newImageSrc);
     const prediction = await predict(truncatedMobileNet, model, imgTensor);
 
+    let direction;
+    let gesture;
+
     switch (prediction) {
+
       case 0:
-        return 1;
+        direction = 1; // up
+        gesture = "UP";
+        break;
       case 1:
-        return 3;
+        direction = 3; // down
+        gesture = "DOWN";
+        break;
       case 2:
-        return 2;
+        direction = 2; // left
+        gesture = "LEFT";
+        break;
       case 3:
-        return 0;
+        direction = 0; // right
+        gesture = "RIGHT";
+        break;
       default:
-        return -1;
+        direction = -1;
+        gesture = "UNKNOWN";
+        break;
+
+      // case 0:
+      //   return 1;
+      // case 1:
+      //   return 3;
+      // case 2:
+      //   return 2;
+      // case 3:
+      //   return 0;
+      // default:
+      //   return -1;
     }
+
+    // Set gesture feedback to update the UI
+    if (setGestureFeedback) {
+      setGestureFeedback(gesture);
+    }
+
+    return direction;    
+
   }
 }
 
