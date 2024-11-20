@@ -9,14 +9,17 @@ export const learningRateAtom = atom(0.0001); // Learning rate
 export const gameRunningAtom = atom(false); // Game state
 export const predictionAtom = atom(null); // Current prediction
 
+
 // ---- Model Training ----
 export const modelAtom = atom(null); // Model
 export const truncatedMobileNetAtom = atom(loadTruncatedMobileNet()); // truncatedMobileNet
 export const imgSrcArrAtom = atom([]); // collected images, formate {src: string, label: string}
 
+
 // ---- UI Display ----
 export const lossAtom = atom(null); // Loss value
 export const trainingProgressAtom = atom(-1); // Training progress
 export const stopTrainingAtom = atom(false); // Flag to stop training
+export const trainingEndedAtom = atom(false);
 
 

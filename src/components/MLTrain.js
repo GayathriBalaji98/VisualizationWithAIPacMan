@@ -1,3 +1,5 @@
+import {  } from "@mui/material";
+import * as tf from '@tensorflow/tfjs';
 import {
     Button,
     InputLabel,
@@ -6,6 +8,11 @@ import {
     Grid,
     Typography,
     LinearProgress,
+    Dialog,
+    DialogTitle,
+    DialogContent,
+    DialogActions,
+    Tooltip
 } from "@mui/material";
 import React, { useEffect, useState, Suspense, useRef } from "react";
 import { buildModel, processImages, predictDirection } from "../model";
@@ -23,8 +30,12 @@ import {
     imgSrcArrAtom,
     gameRunningAtom,
     predictionAtom,
+    trainingEndedAtom
 } from "../GlobalState";
 import { useAtom } from "jotai";
+import InfoIcon from "@mui/icons-material/Info"; 
+
+
 import { data, train } from "@tensorflow/tfjs";
 // import JSONWriter from "./JSONWriter";
 // import JSONLoader from "./JSONLoader";
@@ -80,6 +91,21 @@ export default function MLTrain({ webcamRef }) {
     
     const [, setStopTraining] = useAtom(stopTrainingAtom);
 
+    const [trainingCompleted, setTrainingCompleted] = useState(false);
+    const [, setTrainingEnded] = useAtom(trainingEndedAtom);
+
+    const [confidenceScore, setConfidenceScore] = useState(null);
+
+
+
+    useEffect(() => {
+        // Check if imgSrcArr is empty and set trainingEnded to false
+        if (imgSrcArr.length === 0) {
+            setTrainingEnded(false);
+        }
+    }, [imgSrcArr, setTrainingEnded]);
+    
+
     // Reference to update isRunning
     const isRunningRef = useRef(isRunning);
 
@@ -106,7 +132,57 @@ export default function MLTrain({ webcamRef }) {
     }, [isRunning]);
 
     
+    const handleTrainingEnd = () => {
+        setTrainingEnded(true);
+        calculateConfidenceScore(); 
+      };
 
+      useEffect(() => {
+        if (model && imgSrcArr.length > 0 && trainingCompleted) {
+            calculateConfidenceScore();
+        }
+    }, [model, imgSrcArr, trainingCompleted]);
+
+    async function calculateConfidenceScore() {
+        if (model && imgSrcArr.length > 0) {
+            const dataset = await processImages(imgSrcArr, truncatedMobileNet);
+    
+            const predictions = model.predict(dataset.xs);
+    
+            const probabilities = tf.softmax(predictions);
+            const confidenceScores = probabilities.max(1); // Maximum probability per sample
+            const meanConfidence = tf.mean(confidenceScores).dataSync()[0];
+    
+            setConfidenceScore(meanConfidence); // Update state with the average score
+        }
+    }
+
+    function getConfidenceColor(confidence) {
+        if (confidence >= 0.8) {
+            return 'green';  // High confidence
+        } else if (confidence >= 0.4) {
+            return 'gold'; // Moderate confidence
+        } else {
+            return 'red';    // Low confidence
+        }
+    }
+
+    function getConfidenceLabel(confidence) {
+        if (confidence >= 0.8) return 'Very Confident';
+        if (confidence >= 0.6) return 'Confident';
+        if (confidence >= 0.4) return 'Neutral';
+        if (confidence >= 0.2) return 'Low Confidence';
+        return 'Very Uncertain';
+    }
+
+    function getConfidenceEmoji(confidence) {
+        if (confidence >= 0.8) return "🌕"; // Full moon
+        if (confidence >= 0.6) return "🌖"; // Waxing Gibbous
+        if (confidence >= 0.4) return "🌗"; // Waning Gibbous
+        if (confidence >= 0.2) return "🌑"; // New moon
+        return "🌚"; // Dark moon
+    }
+    
     // Train the model when called
     async function trainModel() {
         setTrainingProgress("Stop");
@@ -117,7 +193,9 @@ export default function MLTrain({ webcamRef }) {
             hiddenUnits,
             batchSize,
             epochs,
-            learningRate)
+            learningRate,
+            setTrainingCompleted,
+            handleTrainingEnd)
         setModel(model);
     }
 
@@ -131,6 +209,48 @@ export default function MLTrain({ webcamRef }) {
             {/* Or <JSONLoader /> */}
         </Typography>
     );
+
+    
+    const confidenceDisplay = (
+        <div style={{ width: '100%', marginTop: '10px' }}>
+            {/* Confidence Progress Bar */}
+            <div
+                style={{
+                    width: '100%',
+                    backgroundColor: '#e0e0e0',
+                    borderRadius: '5px',
+                    marginBottom: '10px',
+                }}
+            >
+                <div
+                    style={{
+                        height: '10px',
+                        width: `${confidenceScore * 100}%`,
+                        backgroundColor: getConfidenceColor(confidenceScore),
+                        borderRadius: '5px',
+                    }}
+                />
+            </div>
+    
+            {/* Confidence Score Text */}
+            <div style={{ display: 'flex', alignItems: 'center' }}>
+                <Typography variant="h6" color={getConfidenceColor(confidenceScore)}>
+                    Confidence: {confidenceScore === null ? "Not available yet" : `${(confidenceScore * 100).toFixed(2)}%`}
+                    <span>{getConfidenceEmoji(confidenceScore)}</span>
+                </Typography>
+                <Tooltip title="This score indicates how confident the model is about its prediction. Higher values mean more confidence.">
+                    <InfoIcon style={{ marginLeft: '8px', cursor: 'pointer' }} />
+                </Tooltip>
+            </div>
+    
+            {/* Confidence Label */}
+            <Typography variant="body2" color={getConfidenceColor(confidenceScore)}>
+                {confidenceScore === null ? "Waiting for predictions..." : getConfidenceLabel(confidenceScore)}
+            </Typography>
+        </div>
+    );
+    
+    
 
     const ReguarlDisplay = (
         <Grid container space={2}>
@@ -156,6 +276,7 @@ export default function MLTrain({ webcamRef }) {
                 <Typography variant="h6">
                     LOSS: {lossVal === null ? "" : lossVal} <br />
                     Dataset Size: {imgSrcArr.length} <br />
+                    {confidenceDisplay}
                 </Typography>
                 {/* <JSONWriter /> <br /> */}
             </Grid>
@@ -199,8 +320,19 @@ export default function MLTrain({ webcamRef }) {
     );
 
     return (
+        <>
         <Suspense fallback={<div>Loading...</div>}>
             {imgSrcArr.length === 0 ? EmptyDatasetDisaply : ReguarlDisplay}
         </Suspense>
+        <Dialog open={trainingCompleted} onClose={() => setTrainingCompleted(false)}>
+        <DialogTitle>Training Completed</DialogTitle>
+        <DialogContent>
+            <Typography>Your model has been successfully trained!</Typography>
+        </DialogContent>
+        <DialogActions>
+            <Button onClick={() => setTrainingCompleted(false)}>Close</Button>
+        </DialogActions>
+    </Dialog>
+    </>
     );
 }

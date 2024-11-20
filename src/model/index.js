@@ -1,5 +1,5 @@
 import * as tf from "@tensorflow/tfjs";
-import { getDefaultStore } from "jotai";
+import { getDefaultStore, useAtom } from "jotai";
 import { stopTrainingAtom, trainingProgressAtom } from "../GlobalState";
 
 export async function loadTruncatedMobileNet() {
@@ -72,7 +72,9 @@ export async function buildModel(
   hiddenUnits = 100,
   batchSize = 1,
   epochs = 100,
-  learningrate = 0.0001
+  learningrate = 0.0001,
+  setTrainingCompleted,
+  handleTrainingEnd
 ) {
   const model = tf.sequential({
     layers: [
@@ -113,7 +115,8 @@ export async function buildModel(
       },
       onTrainEnd: async () => {
         store.set(trainingProgressAtom, -1);
-
+        setTrainingCompleted(true); 
+        handleTrainingEnd();
         console.log("Training has ended.");
       },
       onEpochEnd: async (epoch, logs) => {
@@ -138,6 +141,9 @@ export async function predict(truncatedMobileNet, model, img) {
   const predictions = await model.predict(embeddings);
   const predictedClass = predictions.as1D().argMax();
   const classId = (await predictedClass.data())[0];
+  const softmaxValues = predictions.softmax();
+  const confidence = (await softmaxValues.max().data())[0];
+  console.log("Vishal",confidence);
   return classId;
 }
 
