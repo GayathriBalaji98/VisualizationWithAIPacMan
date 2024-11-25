@@ -21,5 +21,6 @@ export const lossAtom = atom(null); // Loss value
 export const trainingProgressAtom = atom(-1); // Training progress
 export const stopTrainingAtom = atom(false); // Flag to stop training
 export const trainingEndedAtom = atom(false);
+export const visualizationActiveAtom = atom(false); // Add this new atom
 
 
