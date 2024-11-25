@@ -30,13 +30,15 @@ import {
     imgSrcArrAtom,
     gameRunningAtom,
     predictionAtom,
-    trainingEndedAtom
+    trainingEndedAtom,
+    visualizationActiveAtom
 } from "../GlobalState";
 import { useAtom } from "jotai";
 import InfoIcon from "@mui/icons-material/Info"; 
 
 
 import { data, train } from "@tensorflow/tfjs";
+import UMAPVisualization from './UMAPVisualization';
 // import JSONWriter from "./JSONWriter";
 // import JSONLoader from "./JSONLoader";
 
@@ -95,7 +97,7 @@ export default function MLTrain({ webcamRef }) {
     const [, setTrainingEnded] = useAtom(trainingEndedAtom);
 
     const [confidenceScore, setConfidenceScore] = useState(null);
-
+    const [, setVisualizationActive] = useAtom(visualizationActiveAtom);
 
 
     useEffect(() => {
@@ -186,6 +188,7 @@ export default function MLTrain({ webcamRef }) {
     // Train the model when called
     async function trainModel() {
         setTrainingProgress("Stop");
+        setVisualizationActive(true); // Enable visualization when training starts
         const dataset = await processImages(imgSrcArr, truncatedMobileNet);
         const model = await buildModel(truncatedMobileNet,
             setLossVal,
@@ -201,6 +204,7 @@ export default function MLTrain({ webcamRef }) {
 
     const stopTrain = () => {
         setStopTraining(true);
+        setVisualizationActive(false); // Disable visualization when training stops
     };
 
     const EmptyDatasetDisaply = (
@@ -253,7 +257,15 @@ export default function MLTrain({ webcamRef }) {
     
 
     const ReguarlDisplay = (
-        <Grid container space={2}>
+        <Grid 
+            container 
+            spacing={3}  
+            sx={{
+                alignItems: 'flex-start',
+                width: '100%',
+                margin: 0  
+            }}
+        >
             <Grid item xs={6}>
                 <Button
                     variant="contained"
@@ -316,7 +328,25 @@ export default function MLTrain({ webcamRef }) {
                     )}
                 </div>
             </Grid>
-        </Grid>
+            <Grid 
+      item 
+      xs={12}
+      sx={{
+        mt: 2,
+        px: 3, // Add horizontal padding to align with items above
+        '& > div': {
+          width: '100%',
+          maxWidth: '100%', // Allow visualization to take full width of container
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'flex-start' // Align content to the left
+        }
+      }}
+    >
+      <UMAPVisualization />
+    </Grid>
+  </Grid>
+
     );
 
     return (
