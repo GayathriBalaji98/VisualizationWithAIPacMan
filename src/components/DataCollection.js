@@ -16,6 +16,10 @@ import {
     batchSizeAtom,
     gameRunningAtom,
 } from "../GlobalState";
+import IconButton from '@mui/material/IconButton';
+import ImageList from '@mui/material/ImageList';
+import ImageListItem from '@mui/material/ImageListItem';
+import ImageListItemBar from '@mui/material/ImageListItemBar';
 
 const DIRECTIONS = {
     up: <ArrowUpward />,
@@ -130,8 +134,15 @@ export default function DataCollection({ webcamRef }) {
 
 const OneDirection = ({ directionKey, directionIcon, onCapture, dirImgSrcArr, disabled }) => {
     const [, setImgSrcArr] = useAtom(imgSrcArrAtom);
-    const handleDelete = () => {
+    
+    const handleDeleteAll = () => {
         setImgSrcArr((prevArr) => prevArr.filter((img) => img.label !== directionKey));
+    };
+
+    const handleDeleteSingle = (indexToDelete) => {
+        setImgSrcArr((prevArr) => prevArr.filter((_, index) => 
+            !(prevArr[index].label === directionKey && index === indexToDelete)
+        ));
     };
 
     return (
@@ -148,21 +159,61 @@ const OneDirection = ({ directionKey, directionIcon, onCapture, dirImgSrcArr, di
                 <Button
                     variant="contained"
                     color="primary"
-                    onClick={handleDelete}
+                    onClick={handleDeleteAll}
                     disabled={dirImgSrcArr.length === 0}
                     sx={{ marginLeft: 1 }}
                 >
                     <DeleteIcon></DeleteIcon>
                 </Button>
             </Box>
-            <Box textAlign="center" sx={{ width: "100%", height: "100px" }}>
-                {dirImgSrcArr.length > 0 && (
-                    <img
-                        height={"100%"}
-                        src={dirImgSrcArr[dirImgSrcArr.length - 1].src}
-                        style={{ padding: "2px" }}
-                    />
-                )}
+            <Box sx={{ width: "80%", maxHeight: "300px", overflowY: "auto" }}>
+                <ImageList cols={1} gap={8}>
+                    {dirImgSrcArr.map((img, index) => (
+                        <ImageListItem 
+                            key={index}
+                            sx={{ 
+                                position: 'relative',
+                                display: 'flex',
+                                justifyContent: 'center',
+                                '&:hover .delete-button': {
+                                    opacity: 1
+                                }
+                            }}
+                        >
+                            <img
+                                src={img.src}
+                                alt={`${directionKey} ${index}`}
+                                loading="lazy"
+                                style={{ 
+                                    width: '70%', 
+                                    height: 'auto', 
+                                    objectFit: 'cover' 
+                                }}
+                            />
+                            <IconButton
+                                className="delete-button"
+                                onClick={() => handleDeleteSingle(index)}
+                                size="small"
+                                sx={{
+                                    position: 'absolute',
+                                    top: '0',
+                                    right: '20%', // Adjust based on image width (70%)
+                                    transform: 'none',
+                                    backgroundColor: 'primary.main',
+                                    color: 'white',
+                                    opacity: 0,
+                                    transition: 'opacity 0.2s',
+                                    padding: '4px',
+                                    '&:hover': {
+                                        backgroundColor: 'primary.dark'
+                                    }
+                                }}
+                            >
+                                <DeleteIcon fontSize="small" />
+                            </IconButton>
+                        </ImageListItem>
+                    ))}
+                </ImageList>
             </Box>
         </Grid>
     );
