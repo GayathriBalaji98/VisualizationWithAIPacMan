@@ -5,7 +5,7 @@ import { gameRunningAtom, predictionAtom } from "../GlobalState";
 import { useAtom } from "jotai";
 
 import GestureFeedback from './GestureFeedback'; // Import your feedback component
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 export default function PacMan() {
     const [isRunning, setIsRuning] = useAtom(gameRunningAtom);
@@ -42,10 +42,9 @@ export default function PacMan() {
         }
     }, [predictionDirection]);
 
-
     return (
         <>
-            <GestureFeedback gesture={gestureFeedback} /> {/* Gesture feedback component */}
+            <GestureFeedback gesture={gestureFeedback} /> {/* Ensure this component is used */}
             <PacmanCovid
                 {...pacManProps}
                 isRunning={isRunning}
