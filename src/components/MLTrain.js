@@ -95,6 +95,8 @@ export default function MLTrain({ webcamRef }) {
 
   const [trainingCompleted, setTrainingCompleted] = useState(false);
   const [, setTrainingEnded] = useAtom(trainingEndedAtom);
+  const [imageScores, setImageScores] = useState([]);
+  const [dialogOpen, setDialogOpen] = useState(false); // New state for dialog visibility
 
   const [confidenceScore, setConfidenceScore] = useState(null);
   const [, setVisualizationActive] = useAtom(visualizationActiveAtom);
@@ -145,14 +147,20 @@ export default function MLTrain({ webcamRef }) {
   async function calculateConfidenceScore() {
     if (model && imgSrcArr.length > 0) {
       const dataset = await processImages(imgSrcArr, truncatedMobileNet);
-
       const predictions = model.predict(dataset.xs);
-
       const probabilities = tf.softmax(predictions);
-      const confidenceScores = probabilities.max(1); // Maximum probability per sample
-      const meanConfidence = tf.mean(confidenceScores).dataSync()[0];
+      const confidenceScores = probabilities.arraySync();
 
-      setConfidenceScore(meanConfidence); // Update state with the average score
+      const meanConfidence = tf.mean(probabilities.max(1)).dataSync()[0];
+      setConfidenceScore(meanConfidence);
+
+      const imageScores = imgSrcArr.map((img, idx) => ({
+        image: img,
+        scores: confidenceScores[idx],
+        maxScore: Math.max(...confidenceScores[idx]),
+      }));
+      console.log("Image Scores:", imageScores);
+      setImageScores(imageScores); // Update state with detailed scores
     }
   }
 
@@ -213,9 +221,49 @@ export default function MLTrain({ webcamRef }) {
     </Typography>
   );
 
+  const confidenceDetailDisplay = (
+    <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)}>
+      <DialogTitle>Confidence Details</DialogTitle>
+      <DialogContent>
+        {imageScores.map((score, idx) => (
+          <div key={idx} style={{ marginBottom: "15px" }}>
+            <img
+              src={score.image.src} // Access the image property
+              alt={`Image ${idx + 1}`}
+              style={{
+                width: "100%",
+                maxHeight: "200px",
+                objectFit: "cover",
+                marginBottom: "10px",
+              }}
+            />
+            <Typography variant="subtitle1">
+              <strong>Direction Label: {score.image.label}</strong>
+            </Typography>
+            <Typography variant="subtitle1">
+              <strong>Image {idx + 1}:</strong>
+            </Typography>
+            {score.scores.map((val, dir) => (
+              <Typography key={dir}>
+                Direction {dir + 1}: {(val * 100).toFixed(2)}%
+              </Typography>
+            ))}
+            <Typography variant="body2" color="textSecondary">
+              <strong>Highest Confidence:</strong>{" "}
+              {(score.maxScore * 100).toFixed(2)}%
+            </Typography>
+          </div>
+        ))}
+      </DialogContent>
+
+      <DialogActions>
+        <Button onClick={() => setDialogOpen(false)}>Close</Button>
+      </DialogActions>
+    </Dialog>
+  );
+
   const confidenceDisplay = (
     <div style={{ width: "100%", marginTop: "10px" }}>
-      {/* Confidence Progress Bar */}
       <div
         style={{
           width: "100%",
@@ -233,8 +281,6 @@ export default function MLTrain({ webcamRef }) {
           }}
         />
       </div>
-
-      {/* Confidence Score Text */}
       <div style={{ display: "flex", alignItems: "center" }}>
         <Typography variant="h6" color={getConfidenceColor(confidenceScore)}>
           Confidence:{" "}
@@ -247,13 +293,21 @@ export default function MLTrain({ webcamRef }) {
           <InfoIcon style={{ marginLeft: "8px", cursor: "pointer" }} />
         </Tooltip>
       </div>
-
-      {/* Confidence Label */}
       <Typography variant="body2" color={getConfidenceColor(confidenceScore)}>
         {confidenceScore === null
           ? "Waiting for predictions..."
           : getConfidenceLabel(confidenceScore)}
       </Typography>
+      {/* Button to view details */}
+      <Button
+        variant="contained"
+        color="primary"
+        onClick={() => setDialogOpen(true)}
+        disabled={imageScores.length === 0} // Disable if no scores
+        style={{ marginTop: "10px" }}
+      >
+        View Confidence Scores
+      </Button>
     </div>
   );
 
@@ -355,6 +409,7 @@ export default function MLTrain({ webcamRef }) {
       <Suspense fallback={<div>Loading...</div>}>
         {imgSrcArr.length === 0 ? EmptyDatasetDisaply : ReguarlDisplay}
       </Suspense>
+      {confidenceDetailDisplay}
       <Dialog
         open={trainingCompleted}
         onClose={() => setTrainingCompleted(false)}
