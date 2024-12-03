@@ -46,7 +46,8 @@ export default class PacmanCovid extends Component {
       this.step();
     }
     if (prevProps.predictions !== this.props.predictions) {
-      console.log(this.props.predictions);
+      console.log("Predicted direction:", this.props.predictions);
+      // Respect gesture confirmation
       this.changeDirection(this.props.predictions);
     }
   }
@@ -82,7 +83,12 @@ export default class PacmanCovid extends Component {
   }
 
   changeDirection(direction) {
-    this.setState(changeDirection(this.state, { direction }));
+    const { gestureConfirmed } = this.props; // Extract gesture confirmation state
+    if (gestureConfirmed) { // Only change direction if confirmed
+        this.setState(changeDirection(this.state, { direction }));
+    } else {
+        console.log("Gesture not confirmed. Ignoring direction change.");
+    }
   }
 
   handleTheEnd() {

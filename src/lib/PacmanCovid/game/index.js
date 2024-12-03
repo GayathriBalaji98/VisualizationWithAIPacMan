@@ -27,7 +27,13 @@ export function animate(state, { time = Date.now() } = {}) {
     return stateEatenMonsters;
 }
 
-export function changeDirection(state, { direction }) {
+export function changeDirection(state, { direction, gestureConfirmed }) {
+    if (!gestureConfirmed) {
+        console.log("Gesture not confirmed. Ignoring direction change.");
+        return state;
+    }
+    
+    const delayedDirection = direction;
     const orderPolarityOld = orderPolarity(state.player.direction);
     const orderPolarityNew = orderPolarity(direction);
 
@@ -36,8 +42,8 @@ export function changeDirection(state, { direction }) {
             ...state,
             player: {
                 ...state.player,
-                direction,
-                nextDirection: direction
+                direction: delayedDirection,
+                nextDirection: delayedDirection
             }
         };
     }
@@ -46,7 +52,7 @@ export function changeDirection(state, { direction }) {
         ...state,
         player: {
             ...state.player,
-            nextDirection: direction
+            nextDirection: delayedDirection
         }
     };
 }
