@@ -1,6 +1,11 @@
 import * as tf from "@tensorflow/tfjs";
 import { getDefaultStore, useAtom } from "jotai";
-import { stopTrainingAtom, trainingProgressAtom } from "../GlobalState";
+import {
+  stopTrainingAtom,
+  trainingProgressAtom,
+  confidenceAtom,
+  predictionDirectionAtom,
+} from "../GlobalState";
 
 export async function loadTruncatedMobileNet() {
   const mobilenet = await tf.loadLayersModel(
@@ -115,7 +120,7 @@ export async function buildModel(
       },
       onTrainEnd: async () => {
         store.set(trainingProgressAtom, -1);
-        setTrainingCompleted(true); 
+        setTrainingCompleted(true);
         handleTrainingEnd();
         console.log("Training has ended.");
       },
@@ -137,13 +142,16 @@ export async function buildModel(
 }
 
 export async function predict(truncatedMobileNet, model, img) {
+  const store = getDefaultStore();
   const embeddings = truncatedMobileNet.predict(img);
   const predictions = await model.predict(embeddings);
   const predictedClass = predictions.as1D().argMax();
   const classId = (await predictedClass.data())[0];
   const softmaxValues = predictions.softmax();
   const confidence = (await softmaxValues.max().data())[0];
-  console.log("Vishal",confidence);
+  store.set(confidenceAtom, confidence);
+  store.set(predictionDirectionAtom, classId);
+  console.log("Vishal", confidence, classId);
   return classId;
 }
 
