@@ -1,1 +1,0 @@
-from https://github.com/astraube/pacman-covid-19/tree/master
