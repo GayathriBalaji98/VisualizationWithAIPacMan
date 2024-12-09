@@ -27,18 +27,59 @@ export default function UMAPVisualization({ width = 525, height = 400 }) {
     const innerWidth = width - margin.left - margin.right;
     const innerHeight = height - margin.top - margin.bottom;
 
-    const svg = d3
-      .select(svgRef.current)
+    const svg = d3.select(svgRef.current)
       .attr("width", width)
       .attr("height", height);
 
-    // Clear previous visualization
-    svg.selectAll("*").remove();
+    let g = svg.select("g");
+    if (g.empty()) {
+      g = svg.append("g")
+        .attr("transform", `translate(${margin.left},${margin.top})`);
+        
+      g.append("g")
+        .attr("class", "x-axis")
+        .attr("transform", `translate(0,${innerHeight})`);
 
-    // Create main group with margins
-    const g = svg
-      .append("g")
-      .attr("transform", `translate(${margin.left},${margin.top})`);
+      g.append("g")
+        .attr("class", "y-axis");
+
+      g.append("text")
+        .attr("class", "x-label")
+        .attr("x", innerWidth / 2)
+        .attr("y", innerHeight + 35)
+        .attr("text-anchor", "middle")
+        .text("UMAP Dimension 1");
+
+      g.append("text")
+        .attr("class", "y-label")
+        .attr("x", -innerHeight / 2)
+        .attr("y", -45)
+        .attr("text-anchor", "middle")
+        .attr("transform", "rotate(-90)")
+        .text("UMAP Dimension 2");
+
+      const legend = g.append("g")
+        .attr("class", "legend")
+        .attr("transform", `translate(${innerWidth + 20}, 0)`);
+
+      ["up", "down", "left", "right"].forEach((label, i) => {
+        const legendItem = legend
+          .append("g")
+          .attr("transform", `translate(0,${i * 25})`);
+
+        legendItem
+          .append("circle")
+          .attr("r", 5)
+          .attr("fill", colorScale(label));
+
+        legendItem
+          .append("text")
+          .attr("x", 15)
+          .attr("y", 5)
+          .text(label)
+          .style("font-size", "12px");
+      });
+    }
 
     // Convert images to numerical features
     const features = imgSrcArr.map((img) => {
@@ -85,84 +126,48 @@ export default function UMAPVisualization({ width = 525, height = 400 }) {
         .range([innerHeight, 0])
         .nice();
 
-      // Add axes
-      const xAxis = d3.axisBottom(xScale).ticks(5).tickSize(-innerHeight);
+      // Update axes with transition
+      const t = d3.transition().duration(750);
+      
+      g.select(".x-axis")
+        .transition(t)
+        .call(d3.axisBottom(xScale).ticks(5).tickSize(-innerHeight))
+        .call(g => g.selectAll(".domain").remove());
 
-      const yAxis = d3.axisLeft(yScale).ticks(5).tickSize(-innerWidth);
+      g.select(".y-axis")
+        .transition(t)
+        .call(d3.axisLeft(yScale).ticks(5).tickSize(-innerWidth))
+        .call(g => g.selectAll(".domain").remove());
 
-      // Add x-axis
-      g.append("g")
-        .attr("class", "x-axis")
-        .attr("transform", `translate(0,${innerHeight})`)
-        .call(xAxis)
-        .call((g) => g.selectAll(".domain").remove());
-
-      // Add y-axis
-      g.append("g")
-        .attr("class", "y-axis")
-        .call(yAxis)
-        .call((g) => g.selectAll(".domain").remove());
-
-      // Style grid lines
       g.selectAll(".tick line")
         .attr("stroke", "#ddd")
         .attr("stroke-dasharray", "2,2");
 
-      // Add labels
-      g.append("text")
-        .attr("class", "x-label")
-        .attr("x", innerWidth / 2)
-        .attr("y", innerHeight + 35)
-        .attr("text-anchor", "middle")
-        .text("UMAP Dimension 1");
+      // Update points using enter/update/exit pattern
+      const points = g.selectAll("circle.point")
+        .data(embedding);
 
-      g.append("text")
-        .attr("class", "y-label")
-        .attr("x", -innerHeight / 2)
-        .attr("y", -45)
-        .attr("text-anchor", "middle")
-        .attr("transform", "rotate(-90)")
-        .text("UMAP Dimension 2");
-
-      // Draw points in main group
-      g.selectAll("circle.point")
-        .data(embedding)
-        .enter()
+      points.enter()
         .append("circle")
         .attr("class", "point")
-        .attr("cx", (d) => xScale(d[0]))
-        .attr("cy", (d) => yScale(d[1]))
         .attr("r", 5)
-        .attr("fill", (d, i) => colorScale(imgSrcArr[i].label))
         .attr("opacity", 0.7)
-        .on("mouseover", function (event, d) {
+        .merge(points)
+        .transition(t)
+        .attr("cx", d => xScale(d[0]))
+        .attr("cy", d => yScale(d[1]))
+        .attr("fill", (d, i) => colorScale(imgSrcArr[i].label));
+
+      points.exit().remove();
+
+      // Add hover effects
+      g.selectAll("circle.point")
+        .on("mouseover", function(event, d) {
           d3.select(this).transition().duration(200).attr("r", 8);
         })
-        .on("mouseout", function (event, d) {
+        .on("mouseout", function(event, d) {
           d3.select(this).transition().duration(200).attr("r", 5);
         });
-
-      const legend = g
-        .append("g")
-        .attr("transform", `translate(${innerWidth + 20}, 0)`);
-
-      ["up", "down", "left", "right"].forEach((label, i) => {
-        const legendItem = legend
-          .append("g")
-          .attr("transform", `translate(0,${i * 25})`);
-
-        legendItem
-          .append("circle")
-          .attr("r", 5)
-          .attr("fill", colorScale(label));
-
-        legendItem
-          .append("text")
-          .attr("x", 15)
-          .attr("y", 5)
-          .text(label)
-          .style("font-size", "12px");
-      });
     });
   }, [imgSrcArr, trainingProgress, width, height, isVisualizationActive]);
 
