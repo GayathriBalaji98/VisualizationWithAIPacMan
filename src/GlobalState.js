@@ -22,3 +22,15 @@ export const trainingProgressAtom = atom(-1); // Training progress
 export const stopTrainingAtom = atom(false); // Flag to stop training
 export const trainingEndedAtom = atom(false);
 export const visualizationActiveAtom = atom(false); // Add this new atom
+export const confidenceThresholdsAtom = atom({
+  green: 0.7, // High confidence
+  yellow: 0.4, // Medium confidence
+  orange: 0.2, // Low confidence
+});
+
+export const directionAveragesAtom = atom({
+  Up: 0,
+  Down: 0,
+  Left: 0,
+  Right: 0,
+});

@@ -13,6 +13,9 @@ import {
   DialogContent,
   DialogActions,
   Tooltip,
+  Tabs,
+  Tab,
+  Box,
 } from "@mui/material";
 import React, { useEffect, useState, Suspense, useRef } from "react";
 import { buildModel, processImages, predictDirection } from "../model";
@@ -32,6 +35,8 @@ import {
   predictionAtom,
   trainingEndedAtom,
   visualizationActiveAtom,
+  confidenceThresholdsAtom,
+  directionAveragesAtom,
 } from "../GlobalState";
 import { useAtom } from "jotai";
 import InfoIcon from "@mui/icons-material/Info";
@@ -100,6 +105,9 @@ export default function MLTrain({ webcamRef }) {
 
   const [confidenceScore, setConfidenceScore] = useState(null);
   const [, setVisualizationActive] = useAtom(visualizationActiveAtom);
+  const [currentTab, setCurrentTab] = useState(0);
+  const [thresholds] = useAtom(confidenceThresholdsAtom);
+  const [averages, setAverages] = useAtom(directionAveragesAtom);
 
   useEffect(() => {
     // Check if imgSrcArr is empty and set trainingEnded to false
@@ -165,20 +173,21 @@ export default function MLTrain({ webcamRef }) {
   }
 
   function getConfidenceColor(confidence) {
-    if (confidence >= 0.8) {
+    if (confidence >= thresholds.green) {
       return "green"; // High confidence
-    } else if (confidence >= 0.4) {
+    } else if (confidence >= thresholds.yellow) {
       return "gold"; // Moderate confidence
+    } else if (confidence >= thresholds.orange) {
+      return "orange";
     } else {
       return "red"; // Low confidence
     }
   }
 
   function getConfidenceLabel(confidence) {
-    if (confidence >= 0.8) return "Very Confident";
-    if (confidence >= 0.6) return "Confident";
-    if (confidence >= 0.4) return "Neutral";
-    if (confidence >= 0.2) return "Low Confidence";
+    if (confidence >= thresholds.green) return "Very Confident";
+    if (confidence >= thresholds.yellow) return "Confident";
+    if (confidence >= thresholds.orange) return "Neutral";
     return "Very Uncertain";
   }
 
@@ -222,36 +231,101 @@ export default function MLTrain({ webcamRef }) {
   );
 
   const confidenceDetailDisplay = (
-    <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)}>
+    <Dialog
+      open={dialogOpen}
+      onClose={() => setDialogOpen(false)}
+      maxWidth="md"
+      fullWidth
+    >
       <DialogTitle>Confidence Details</DialogTitle>
-      <DialogContent>
-        {imageScores.map((score, idx) => (
-          <div key={idx} style={{ marginBottom: "15px" }}>
-            <img
-              src={score.image.src} // Access the image property
-              alt={`Image ${idx + 1}`}
-              style={{
-                width: "100%",
-                maxHeight: "200px",
-                objectFit: "cover",
-                marginBottom: "10px",
-              }}
+
+      <Tabs
+        value={currentTab}
+        onChange={(event, newValue) => setCurrentTab(newValue)}
+        centered
+      >
+        {["Up", "Down", "Left", "Right"].map((direction, index) => {
+          const averageScore =
+            imageScores
+              .filter(
+                (score) =>
+                  score.image.label.toLowerCase() === direction.toLowerCase()
+              )
+              .map((score) => score.scores[index] * 100)
+              .reduce((a, b) => a + b, 0) /
+              imageScores.filter(
+                (score) =>
+                  score.image.label.toLowerCase() === direction.toLowerCase()
+              ).length || 0;
+
+          useEffect(() => {
+            setAverages((prev) => ({
+              ...prev,
+              [direction]: averageScore,
+            }));
+          }, [averageScore, direction]);
+          return (
+            <Tab
+              key={direction}
+              label={`${direction} (Avg: ${averageScore.toFixed(2)}%)`}
             />
-            <Typography variant="subtitle1">
-              <strong>Direction Label: {score.image.label}</strong>
-            </Typography>
-            <Typography variant="subtitle1">
-              <strong>Image {idx + 1}:</strong>
-            </Typography>
-            {score.scores.map((val, dir) => (
-              <Typography key={dir}>
-                Direction {dir + 1}: {(val * 100).toFixed(2)}%
-              </Typography>
-            ))}
-            <Typography variant="body2" color="textSecondary">
-              <strong>Highest Confidence:</strong>{" "}
-              {(score.maxScore * 100).toFixed(2)}%
-            </Typography>
+          );
+        })}
+      </Tabs>
+
+      <DialogContent>
+        {["Up", "Down", "Left", "Right"].map((direction, dirIndex) => (
+          <div key={direction} role="tabpanel" hidden={currentTab !== dirIndex}>
+            {currentTab === dirIndex && (
+              <Box
+                sx={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
+                  gap: 2,
+                }}
+              >
+                {imageScores
+                  .filter(
+                    (score) =>
+                      score.image.label.toLowerCase() ===
+                      direction.toLowerCase()
+                  )
+                  .map((score, idx) => (
+                    <Box
+                      key={idx}
+                      sx={{
+                        border: "1px solid #ddd",
+                        borderRadius: 2,
+                        p: 2,
+                        textAlign: "center",
+                      }}
+                    >
+                      <img
+                        src={score.image.src}
+                        alt={`${direction} Image ${idx + 1}`}
+                        style={{
+                          width: "100%",
+                          maxHeight: "200px",
+                          objectFit: "cover",
+                          marginBottom: "10px",
+                        }}
+                      />
+                      <Typography variant="subtitle1">
+                        <strong>Direction Label: {score.image.label}</strong>
+                      </Typography>
+                      {score.scores.map((val, dir) => (
+                        <Typography key={dir}>
+                          Direction {dir + 1}: {(val * 100).toFixed(2)}%
+                        </Typography>
+                      ))}
+                      <Typography variant="body2" color="textSecondary">
+                        <strong>Highest Confidence:</strong>{" "}
+                        {(score.maxScore * 100).toFixed(2)}%
+                      </Typography>
+                    </Box>
+                  ))}
+              </Box>
+            )}
           </div>
         ))}
       </DialogContent>
@@ -303,7 +377,7 @@ export default function MLTrain({ webcamRef }) {
         variant="contained"
         color="primary"
         onClick={() => setDialogOpen(true)}
-        disabled={imageScores.length === 0} // Disable if no scores
+        disabled={imageScores.length === 0}
         style={{ marginTop: "10px" }}
       >
         View Confidence Scores
