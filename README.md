@@ -9,9 +9,12 @@ ML-PACMAN is an interactive, browser-based adaptation of the classic Pac-Man gam
 - **Data Visualization**: Utilize UMAP to explore and analyze input datasets.
 - **Classic Gameplay**: Enjoy Pac-Man’s familiar mechanics with an innovative twist.
 
+## 🎮 Demo and Screenshots
 
-## 🎮 Demo
-Check out the demo: `demo.mov`
+Check out the demo: 
+
+https://drive.google.com/file/d/1fq-5OsQW3Xrk3sSSQKDDa_rUDsokO9cw/view?usp=drive_link
+https://drive.google.com/file/d/1ea_ewyBiWCiTkgAGFawg1BiHHMFN2UX2/view?usp=drive_link
 
 ## 🔧 Technologies Used
 - **React**: Frontend framework for building an interactive user interface.
