@@ -1,0 +1,1 @@
+Project for playing a ML based PacMan game with gestures from camera as input for training and live play. Visualized the game play with features like accuracy, loss curve, UMAP, Confidence score display, real time gesture feedback using React. 
